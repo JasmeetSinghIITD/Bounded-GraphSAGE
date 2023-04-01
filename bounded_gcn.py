@@ -9,15 +9,17 @@ from deeprobust.graph import utils
 from copy import deepcopy
 from sklearn.metrics import f1_score
 
-class GraphConvolution(Module):
-    """Simple GCN layer, similar to https://github.com/tkipf/pygcn
-    """
+import torch
+from torch import nn
+from torch.nn import Parameter
 
-    def __init__(self, in_features, out_features, with_bias=True):
-        super(GraphConvolution, self).__init__()
+class GraphSage(nn.Module):
+    def __init__(self, in_features, out_features, hidden_features, with_bias=True):
+        super(GraphSage, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = Parameter(torch.FloatTensor(in_features, out_features))
+        self.hidden_features = hidden_features
+        self.weight = Parameter(torch.FloatTensor(2*hidden_features, out_features))
         if with_bias:
             self.bias = Parameter(torch.FloatTensor(out_features))
         else:
@@ -25,24 +27,21 @@ class GraphConvolution(Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
-        self.weight.data.uniform_(-stdv, stdv)
+        nn.init.xavier_uniform_(self.weight)
         if self.bias is not None:
-            self.bias.data.uniform_(-stdv, stdv)
+            nn.init.zeros_(self.bias)
 
-    def forward(self, input, adj):
-        """ Graph Convolutional Layer forward function
-        """
-        if input.data.is_sparse:
-            support = torch.spmm(input, self.weight)
-        else:
-            support = torch.mm(input, self.weight)
-        output = torch.spmm(adj, support)
+    def forward(self, x, adj):
+        adj = adj.to_dense()
+        support = torch.mm(x, self.weight[:self.hidden_features])
+        neighbor_support = torch.mm(torch.mm(adj, x), self.weight[self.hidden_features:])
+        neighbor_aggregation = neighbor_support.mean(dim=1, keepdim=True)
+        output = torch.cat([support, neighbor_aggregation], dim=1)
+        output = torch.relu(output)
+        output = torch.mm(output, self.weight)
         if self.bias is not None:
-            return output + self.bias
-        else:
-            return output
-
+            output = output + self.bias
+        return output
     def __repr__(self):
         return self.__class__.__name__ + ' (' \
                + str(self.in_features) + ' -> ' \
