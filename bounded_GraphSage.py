@@ -8,7 +8,8 @@ from torch.nn.modules.module import Module
 from deeprobust.graph import utils
 from copy import deepcopy
 from sklearn.metrics import f1_score
-
+from deeprobust.graph.defense import GraphSage
+from deeprobust.graph.defense import GraphConvolution
 class GraphSageLayer(Module):
     """GraphSAGE layer implementation based on https://arxiv.org/abs/1706.02216
     """
@@ -123,8 +124,8 @@ class BoundedGraphSAGE(nn.Module):
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.sage1 = GraphSageLayer(nfeat, nhid, with_bias=with_bias)
-        self.sage2 = GraphSageLayer(nhid, nclass, with_bias=with_bias)
+        self.sage1 = GraphSage(nfeat, nhid, with_bias=with_bias)
+        self.sage2 = GraphSage(nhid, nclass, with_bias=with_bias)
         self.dropout = dropout
         self.lr = lr
         self.bound = bound
@@ -141,14 +142,14 @@ class BoundedGraphSAGE(nn.Module):
         self.features = None
 
     def forward(self, x, adj):
-        if self.with_relu:
-            x = F.relu(self.sage1(x, adj))
-        else:
-            x = self.sage1(x, adj)
-
-        x = F.dropout(x, self.dropout, training=self.training)
-        x = self.sage2(x, adj)
+        x = self.embed(x)
+        for i in range(self.num_layers):
+           x = self.aggregators[i](adj, x)
+           x = self.activations[i](x)
+           x = F.dropout(x, p=self.dropout, training=self.training)
+           x = self.projector(x)
         return F.log_softmax(x, dim=1)
+
 
     def initialize(self):
         """Initialize parameters of GCN.
