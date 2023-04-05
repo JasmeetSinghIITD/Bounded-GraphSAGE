@@ -156,20 +156,20 @@ class BoundedGraphSAGE(nn.Module):
     adj_norm : torch.Tensor
         The normalized adjacency matrix of the graph.
     """
-       adj = adj.to(device)
+        adj = adj.to(device)
 
     # Add self-loops to adjacency matrix
-       adj = adj + torch.eye(adj.shape[0], device=device)
+        adj = adj + torch.eye(adj.shape[0], device=device)
 
     # Compute the degree matrix
-       deg = torch.sparse.sum(adj, dim=1).to_dense()
-       deg_inv_sqrt = deg.pow(-0.5)
-       deg_inv_sqrt[torch.isinf(deg_inv_sqrt)] = 0.
+        deg = torch.sparse.sum(adj, dim=1).to_dense()
+        deg_inv_sqrt = deg.pow(-0.5)
+        deg_inv_sqrt[torch.isinf(deg_inv_sqrt)] = 0.
 
     # Compute the normalized adjacency matrix
-       adj_norm = deg_inv_sqrt.unsqueeze(1) * adj * deg_inv_sqrt.unsqueeze(0)
+        adj_norm = deg_inv_sqrt.unsqueeze(1) * adj * deg_inv_sqrt.unsqueeze(0)
     
-       return adj_norm
+        return adj_norm
 
 	
     def embed(self, x, adj):
