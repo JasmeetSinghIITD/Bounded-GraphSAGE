@@ -9,19 +9,23 @@ from deeprobust.graph import utils
 from copy import deepcopy
 from sklearn.metrics import f1_score
 
-class GraphConvolution(Module):
-    """Simple GCN layer, similar to https://github.com/tkipf/pygcn
+class GraphSageLayer(Module):
+    """GraphSAGE layer implementation based on https://arxiv.org/abs/1706.02216
     """
 
-    def __init__(self, in_features, out_features, with_bias=True):
-        super(GraphConvolution, self).__init__()
+    def __init__(self, in_features, out_features, aggregator_type='mean', with_bias=True):
+        super(GraphSageLayer, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = Parameter(torch.FloatTensor(in_features, out_features))
+        self.aggregator_type = aggregator_type
+        
+        self.weight = Parameter(torch.FloatTensor(in_features * 2, out_features))
+        
         if with_bias:
             self.bias = Parameter(torch.FloatTensor(out_features))
         else:
             self.register_parameter('bias', None)
+        
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -31,22 +35,41 @@ class GraphConvolution(Module):
             self.bias.data.uniform_(-stdv, stdv)
 
     def forward(self, input, adj):
-        """ Graph Convolutional Layer forward function
+        """ GraphSAGE Layer forward function
         """
         if input.data.is_sparse:
-            support = torch.spmm(input, self.weight)
+            input = input.to_dense()
+            
+        adj = adj.to_dense()
+        
+        input_dim = input.shape[1]
+        neigh_dim = input.shape[1]
+        
+        # aggregate neighbor nodes' representations
+        if self.aggregator_type == 'mean':
+            agg_neigh = torch.matmul(adj, input) / torch.sum(adj, dim=1, keepdim=True)
+        elif self.aggregator_type == 'max':
+            agg_neigh, _ = torch.max(torch.matmul(adj, input), dim=1, keepdim=True)
         else:
-            support = torch.mm(input, self.weight)
-        output = torch.spmm(adj, support)
+            raise ValueError('Invalid aggregator type.')
+        
+        # concatenate original node representations with the aggregated neighbor representations
+        concat = torch.cat([input, agg_neigh], dim=1)
+        
+        # perform linear transformation
+        support = torch.mm(concat, self.weight)
+        
+        # add bias term if applicable
         if self.bias is not None:
-            return output + self.bias
+            return support + self.bias
         else:
-            return output
+            return support
 
     def __repr__(self):
         return self.__class__.__name__ + ' (' \
                + str(self.in_features) + ' -> ' \
                + str(self.out_features) + ')'
+
 
 
 class BoundedGCN(nn.Module):
