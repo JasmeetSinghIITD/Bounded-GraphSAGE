@@ -140,9 +140,33 @@ class BoundedGraphSAGE(nn.Module):
         self.best_output = None
         self.adj_norm = None
         self.features = None
+	
+    def embed(self, x, adj):
+        # Compute normalization of the adjacency matrix
+        adj_norm = preprocess_adj(adj, device=self.device)
+        self.adj_norm = adj_norm
+        
+        # Initialize node embeddings
+        x = x.to(self.device)
+        self.features = x
+        
+        # Pass through GraphSage layers
+        x = self.sage1(x, adj_norm)
+        x = F.relu(x) if self.with_relu else x
+        x = F.dropout(x, p=self.dropout, training=self.training)
 
+        x = self.sage2(x, adj_norm)
+        x = F.relu(x) if self.with_relu else x
+        x = F.dropout(x, p=self.dropout, training=self.training)
+
+        # Apply bound to node embeddings
+        if self.bound > 0:
+            x = bounded_tensor(x, self.bound)
+
+        self.output = x
+        return x
     def forward(self, x, adj):
-        x = self.embed(x)
+        x = self.embed(x,adj)
         for i in range(self.num_layers):
            x = self.aggregators[i](adj, x)
            x = self.activations[i](x)
