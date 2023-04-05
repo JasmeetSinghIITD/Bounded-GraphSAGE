@@ -145,7 +145,7 @@ class BoundedGraphSAGE(nn.Module):
         adj = adj.to(device)
 
     
-        adj = adj + torch.eye(adj.shape[0], device=device)
+        #adj = adj + torch.eye(adj.shape[0], device=device)
 
     
         deg = torch.sparse.sum(adj, dim=1).to_dense()
