@@ -10,6 +10,7 @@ from copy import deepcopy
 from sklearn.metrics import f1_score
 from deeprobust.graph.global_attack import GraphSage
 from deeprobust.graph.defense import GraphConvolution
+import warnings
 class GraphSageLayer(Module):
     """GraphSAGE layer implementation based on https://arxiv.org/abs/1706.02216
     """
