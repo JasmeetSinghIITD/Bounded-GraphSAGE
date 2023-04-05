@@ -264,7 +264,7 @@ class RwlGNN:
 
                 
 
-    def train_gcn(self, epoch, features, adj, labels, idx_train, idx_val):
+    def train_graphsage(self, epoch, features, adj, labels, idx_train, idx_val):
         args = self.args
         # estimator = self.estimator
         adj = self.normalize()
@@ -275,7 +275,7 @@ class RwlGNN:
 
         output = self.model(features, adj)
 
-        self.l2_reg =  2 * self.bound  * ( torch.log(torch.norm(self.model.gc1.weight)) + torch.log(torch.norm(self.model.gc2.weight)) )  # Added by me
+        self.l2_reg =  2 * self.bound  * ( torch.log(torch.norm(self.model.sage1.weight)) + torch.log(torch.norm(self.model.sage2.weight)) )  # Added by me
 
         if self.l2_reg <0:
             self.l2_reg = 0
@@ -301,14 +301,14 @@ class RwlGNN:
             self.best_graph = adj.detach()
             self.weights = deepcopy(self.model.state_dict())
             if args.debug:
-                print('\t=== saving current graph/gcn, best_val_acc: %s' % self.best_val_acc.item())
+                print('\t=== saving current graph, best_val_acc: %s' % self.best_val_acc.item())
 
         if loss_val < self.best_val_loss:
             self.best_val_loss = loss_val
             self.best_graph = adj.detach()
             self.weights = deepcopy(self.model.state_dict())
             if args.debug:
-                print(f'\t=== saving current graph/gcn, best_val_loss: %s' % self.best_val_loss.item())
+                print(f'\t=== saving current graph, best_val_loss: %s' % self.best_val_loss.item())
 
         if args.debug:
             if epoch % 1 == 0:
