@@ -124,8 +124,8 @@ class BoundedGraphSAGE(nn.Module):
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.sage1 = GraphSage(nfeat, nhid, with_bias=with_bias)
-        self.sage2 = GraphSage(nhid, nclass, with_bias=with_bias)
+        self.sage1 = GraphSageLayer(nfeat, nhid, with_bias=with_bias)
+        self.sage2 = GraphSageLayer(nhid, nclass, with_bias=with_bias)
         self.dropout = dropout
         self.lr = lr
         self.bound = bound
