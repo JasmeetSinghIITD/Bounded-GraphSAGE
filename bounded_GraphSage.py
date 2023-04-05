@@ -160,7 +160,7 @@ class BoundedGraphSAGE(nn.Module):
 	
     def embed(self, x, adj):
         # Compute normalization of the adjacency matrix
-        adj_norm = preprocess_adj(adj, device=self.device)
+        adj_norm = self.preprocess_adj(adj, device=self.device)
         self.adj_norm = adj_norm
         
         # Initialize node embeddings
