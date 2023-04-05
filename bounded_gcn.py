@@ -72,7 +72,7 @@ class GraphSageLayer(Module):
 
 
 
-class BoundedGCN(nn.Module):
+class BoundedGraphSAGE(nn.Module):
     """ 2 Layer Graph Convolutional Network.
     Parameters
     ----------
@@ -114,20 +114,20 @@ class BoundedGCN(nn.Module):
     """
 
     def __init__(self, nfeat, nhid, nclass, dropout=0.5, lr=0.01, weight_decay=5e-4,
-            with_relu=True, with_bias=True, device=None,bound=0 ):
+                 with_relu=True, with_bias=True, device=None, bound=0):
 
-        super(BoundedGCN, self).__init__()
+        super(BoundedGraphSAGE, self).__init__()
 
         assert device is not None, "Please specify 'device'!"
         self.device = device
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = GraphConvolution(nfeat, nhid, with_bias=with_bias)
-        self.gc2 = GraphConvolution(nhid, nclass, with_bias=with_bias)
+        self.sage1 = GraphSageLayer(nfeat, nhid, with_bias=with_bias)
+        self.sage2 = GraphSageLayer(nhid, nclass, with_bias=with_bias)
         self.dropout = dropout
         self.lr = lr
-        self.bound=bound
+        self.bound = bound
         if not with_relu:
             self.weight_decay = 0
         else:
@@ -142,19 +142,19 @@ class BoundedGCN(nn.Module):
 
     def forward(self, x, adj):
         if self.with_relu:
-            x = F.relu(self.gc1(x, adj))
+            x = F.relu(self.sage1(x, adj))
         else:
-            x = self.gc1(x, adj)
+            x = self.sage1(x, adj)
 
         x = F.dropout(x, self.dropout, training=self.training)
-        x = self.gc2(x, adj)
+        x = self.sage2(x, adj)
         return F.log_softmax(x, dim=1)
 
     def initialize(self):
         """Initialize parameters of GCN.
         """
-        self.gc1.reset_parameters()
-        self.gc2.reset_parameters()
+        self.sage1.reset_parameters()
+        self.sage2.reset_parameters()
 
     def fit(self, features, adj, labels, idx_train, idx_val=None, train_iters=200, initialize=True, verbose=False, normalize=True, patience=500, **kwargs):
         """Train the gcn model, when idx_val is not None, pick the best model according to the validation loss.
@@ -181,8 +181,8 @@ class BoundedGCN(nn.Module):
         patience : int
             patience for early stopping, only valid when `idx_val` is given
         """
-        print(" Using bounded gcn")
-        self.device = self.gc1.weight.device
+        print(" Using bounded GraphSAGE")
+        self.device = self.sage1.weight.device
         if initialize:
             self.initialize()
 
@@ -221,10 +221,10 @@ class BoundedGCN(nn.Module):
         for i in range(train_iters):
             optimizer.zero_grad()
             output = self.forward(self.features, self.adj_norm)
-            #self.l2_reg = self.bound * torch.square(torch.norm(self.gc1.weight)) + torch.square(torch.norm(self.gc2.weight))  # Added by me
+            self.l2_reg = self.bound * torch.square(torch.norm(self.sage1.weight)) + torch.square(torch.norm(self.sage2.weight))  # Added by me
 
             print(f'L2 reg at iteration {i} = {l2_reg}')
-            loss_train = F.nll_loss(output[idx_train], labels[idx_train]) + self.bound*self.l2_reg
+            loss_train = F.nll_loss(output[idx_train], labels[idx_train]) + self.l2_reg
             loss_train.backward()
             optimizer.step()
             if verbose and i % 10 == 0:
@@ -237,7 +237,7 @@ class BoundedGCN(nn.Module):
     def _train_with_val(self, labels, idx_train, idx_val, train_iters, verbose):
         print("Training with val")
         if verbose:
-            print('=== training gcn model ===')
+            print('=== training GraphSAGE model ===')
         optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
         best_loss_val = 100
@@ -248,12 +248,12 @@ class BoundedGCN(nn.Module):
             optimizer.zero_grad()
             output = self.forward(self.features, self.adj_norm)
 
-            self.l2_reg = 2 * self.bound * (torch.log(torch.norm(self.gc1.weight)) + torch.log(torch.norm(self.gc2.weight)) )    # Added by me
+            self.l2_reg = 2 * self.bound * (torch.log(torch.norm(self.sage1.weight)) + torch.log(torch.norm(self.sage2.weight)) )    # Added by me
 
             if self.l2_reg<0:
                 self.l2_reg=0
 
-            loss_train = F.nll_loss(output[idx_train], labels[idx_train]) + self.bound*self.l2_reg
+            loss_train = F.nll_loss(output[idx_train], labels[idx_train]) + self.l2_reg
 
             if i%10==0:
                 print(f'l2 Reg = {self.l2_reg} , Loss = {loss_train}')
@@ -286,7 +286,7 @@ class BoundedGCN(nn.Module):
     def _train_with_early_stopping(self, labels, idx_train, idx_val, train_iters, patience, verbose):
         print("Training with early stopping")
         if verbose:
-            print('=== training gcn model ===')
+            print('=== training GraphSAGE model ===')
         optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
         early_stopping = patience
