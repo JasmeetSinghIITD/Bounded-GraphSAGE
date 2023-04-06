@@ -9,51 +9,74 @@ from deeprobust.graph import utils
 from copy import deepcopy
 from sklearn.metrics import f1_score
 
-class GraphSAGE(Module):
-    def __init__(self, in_features, out_features, agg_func='mean', bias=True):
-        super(GraphSAGE, self).__init__()
+class GraphSAGEConvolution(nn.Module):
+    def __init__(self, in_features, out_features, aggregator_type='mean', bias=True):
+        super(GraphSAGEConvolution, self).__init__()
+        
         self.in_features = in_features
         self.out_features = out_features
-        self.agg_func = agg_func
-        self.weight = Parameter(torch.FloatTensor(in_features * 2, out_features))
+        self.aggregator_type = aggregator_type
+        
+        if aggregator_type == 'mean':
+            self.aggregator = MeanAggregator(in_features, out_features)
+        elif aggregator_type == 'maxpool':
+            self.aggregator = MaxPoolAggregator(in_features, out_features)
+        else:
+            raise ValueError("Invalid aggregator type. Must be 'mean' or 'maxpool'.")
+        
+        self.weight = nn.Parameter(torch.FloatTensor(out_features, out_features))
         if bias:
-            self.bias = Parameter(torch.FloatTensor(out_features))
+            self.bias = nn.Parameter(torch.FloatTensor(out_features))
         else:
             self.register_parameter('bias', None)
         self.reset_parameters()
 
     def reset_parameters(self):
-        torch.nn.init.xavier_uniform_(self.weight)
+        stdv = 1. / math.sqrt(self.weight.size(1))
+        self.weight.data.uniform_(-stdv, stdv)
         if self.bias is not None:
-            self.bias.data.fill_(0)
+            self.bias.data.uniform_(-stdv, stdv)
+
+    def forward(self, x, adj):
+        x = self.aggregator(x, adj)
+        x = torch.matmul(x, self.weight)
+        if self.bias is not None:
+            x = x + self.bias
+        return F.relu(x)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__} ({self.in_features} -> {self.out_features}, aggregator_type='{self.aggregator_type}')"
+
+
+class MeanAggregator(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(MeanAggregator, self).__init__()
+        self.lin = nn.Linear(in_features, out_features, bias=False)
 
     def forward(self, x, adj):
         adj = adj.to_dense()
-        if adj.dtype == torch.bool:
-            adj = adj.float()
-        h_neigh = torch.spmm(adj, x)
-        h_self = x
-        if self.agg_func == 'mean':
-            deg = adj.sum(1, keepdim=True)
-            deg_inv = deg.pow(-1)
-            deg_inv[deg_inv == float('inf')] = 0
-            h_neigh = torch.mm(deg_inv, h_neigh)
-            h_self = torch.mm(deg_inv, h_self)
-        else:
-            h_neigh = F.normalize(h_neigh, p=1, dim=1)
-            h_self = F.normalize(h_self, p=1, dim=1)
-        h = torch.cat((h_self, h_neigh), dim=1)
-        h = torch.mm(h, self.weight)
-        if self.bias is not None:
-            h = h + self.bias
-        return h
-    def __repr__(self):
-        return self.__class__.__name__ + ' (' \
-               + str(self.in_features) + ' -> ' \
-               + str(self.out_features) + ')'
+        adj[adj != 0] = 1
+        adj = adj / adj.sum(1, keepdim=True)
+        x = torch.matmul(adj, x)
+        x = self.lin(x)
+        return x
 
 
-class BoundedGraphSage(nn.Module):
+class MaxPoolAggregator(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(MaxPoolAggregator, self).__init__()
+        self.lin = nn.Linear(in_features, out_features, bias=False)
+
+    def forward(self, x, adj):
+        adj = adj.to_dense()
+        adj[adj != 0] = 1
+        x = torch.matmul(adj, x)
+        x = self.lin(x)
+        x, _ = x.max(1, keepdim=True)
+        return x
+
+
+class BoundedGCN(nn.Module):
     """ 2 Layer Graph Convolutional Network.
     Parameters
     ----------
@@ -97,15 +120,15 @@ class BoundedGraphSage(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout=0.5, lr=0.01, weight_decay=5e-4,
             with_relu=True, with_bias=True, device=None,bound=0 ):
 
-        super(BoundedGraphSage, self).__init__()
+        super(BoundedGCN, self).__init__()
 
         assert device is not None, "Please specify 'device'!"
         self.device = device
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = GraphSAGE(nfeat, nhid, with_bias=with_bias)
-        self.gc2 = GraphSAGE(nhid, nclass, with_bias=with_bias)
+        self.gc1 = GraphConvolution(nfeat, nhid, with_bias=with_bias)
+        self.gc2 = GraphConvolution(nhid, nclass, with_bias=with_bias)
         self.dropout = dropout
         self.lr = lr
         self.bound=bound
