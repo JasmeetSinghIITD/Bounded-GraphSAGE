@@ -92,8 +92,8 @@ class BoundedGraphSage(nn.Module):
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = GraphSageConvolution(nfeat, nhid, with_bias=with_bias)
-        self.gc2 = GraphSageConvolution(nhid, nclass, with_bias=with_bias)
+        self.gc1 = GraphSageConvolution(nfeat, nhid)
+        self.gc2 = GraphSageConvolution(nhid, nclass)
         self.dropout = dropout
         self.lr = lr
         self.bound=bound
