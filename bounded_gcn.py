@@ -9,39 +9,30 @@ from deeprobust.graph import utils
 from copy import deepcopy
 from sklearn.metrics import f1_score
 
-class GraphConvolution(Module):
-    """Simple GCN layer, similar to https://github.com/tkipf/pygcn
-    """
+class GraphSageConvolution(Module):
+    """GraphSAGE layer with mean aggregation"""
 
-    def __init__(self, in_features, out_features, with_bias=True):
-        super(GraphConvolution, self).__init__()
+    def __init__(self, in_features, out_features):
+        super(GraphSageConvolution, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = Parameter(torch.FloatTensor(in_features, out_features))
-        if with_bias:
-            self.bias = Parameter(torch.FloatTensor(out_features))
-        else:
-            self.register_parameter('bias', None)
+        self.weight = Parameter(torch.FloatTensor(2 * in_features, out_features))
+        self.bias = Parameter(torch.FloatTensor(out_features))
         self.reset_parameters()
 
     def reset_parameters(self):
         stdv = 1. / math.sqrt(self.weight.size(1))
         self.weight.data.uniform_(-stdv, stdv)
-        if self.bias is not None:
-            self.bias.data.uniform_(-stdv, stdv)
+        self.bias.data.uniform_(-stdv, stdv)
 
-    def forward(self, input, adj):
-        """ Graph Convolutional Layer forward function
+    def forward(self, x, adj):
+        """ GraphSAGE Layer forward function with mean aggregation
         """
-        if input.data.is_sparse:
-            support = torch.spmm(input, self.weight)
-        else:
-            support = torch.mm(input, self.weight)
-        output = torch.spmm(adj, support)
-        if self.bias is not None:
-            return output + self.bias
-        else:
-            return output
+        x = torch.cat((x, torch.sparse.mm(adj, x)), dim=1)
+        x = torch.mm(x, self.weight)
+        x = x / torch.sparse.sum(adj, dim=1).to_dense().view(-1, 1)
+        x = x + self.bias
+        return F.relu(x)
 
     def __repr__(self):
         return self.__class__.__name__ + ' (' \
@@ -49,7 +40,8 @@ class GraphConvolution(Module):
                + str(self.out_features) + ')'
 
 
-class BoundedGCN(nn.Module):
+
+class BoundedGraphSage(nn.Module):
     """ 2 Layer Graph Convolutional Network.
     Parameters
     ----------
@@ -93,15 +85,15 @@ class BoundedGCN(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout=0.5, lr=0.01, weight_decay=5e-4,
             with_relu=True, with_bias=True, device=None,bound=0 ):
 
-        super(BoundedGCN, self).__init__()
+        super(BoundedGraphSage, self).__init__()
 
         assert device is not None, "Please specify 'device'!"
         self.device = device
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = GraphConvolution(nfeat, nhid, with_bias=with_bias)
-        self.gc2 = GraphConvolution(nhid, nclass, with_bias=with_bias)
+        self.gc1 = GraphSageConvolution(nfeat, nhid, with_bias=with_bias)
+        self.gc2 = GraphSageConvolution(nhid, nclass, with_bias=with_bias)
         self.dropout = dropout
         self.lr = lr
         self.bound=bound
