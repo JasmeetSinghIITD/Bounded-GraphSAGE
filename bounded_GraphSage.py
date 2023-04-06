@@ -76,7 +76,7 @@ class MaxPoolAggregator(nn.Module):
         return x
 
 
-class BoundedGCN(nn.Module):
+class BoundedGraphSage(nn.Module):
     """ 2 Layer Graph Convolutional Network.
     Parameters
     ----------
@@ -120,15 +120,15 @@ class BoundedGCN(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout=0.5, lr=0.01, weight_decay=5e-4,
             with_relu=True, with_bias=True, device=None,bound=0 ):
 
-        super(BoundedGCN, self).__init__()
+        super(BoundedGraphSage, self).__init__()
 
         assert device is not None, "Please specify 'device'!"
         self.device = device
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = GraphConvolution(nfeat, nhid, with_bias=with_bias)
-        self.gc2 = GraphConvolution(nhid, nclass, with_bias=with_bias)
+        self.gc1 = GraphSAGEConvolution(nfeat, nhid, with_bias=with_bias)
+        self.gc2 = GraphSAGEConvolution(nhid, nclass, with_bias=with_bias)
         self.dropout = dropout
         self.lr = lr
         self.bound=bound
