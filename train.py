@@ -116,7 +116,7 @@ torch.manual_seed(args.seed)
 if args.bounded == 'y':
     from bounded_gcn import BoundedGraphSage
     print("Using bounded gcn")
-    model = BoundedGCN(nfeat=features.shape[1],
+    model = BoundedGraphSage(nfeat=features.shape[1],
                 nhid=args.hidden,
                 nclass=labels.max().item() + 1,
                 dropout=args.dropout, device=device,bound=args.bound)
