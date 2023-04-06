@@ -142,17 +142,17 @@ class BoundedGraphSAGE(nn.Module):
         self.features = None
     def preprocess_adj(adj, device):
     
-        adj = adj.to(device)
+#         adj = adj.to(device)
 
     
-        #adj = adj + torch.eye(adj.shape[0], device=device)
+#         #adj = adj + torch.eye(adj.shape[0], device=device)
 
     
-        deg = torch.sparse.sum(adj, dim=1).to_dense()
-        deg_inv_sqrt = deg.pow(-0.5)
-        deg_inv_sqrt[torch.isinf(deg_inv_sqrt)] = 0.
+#         deg = torch.sparse.sum(adj, dim=1).to_dense()
+#         deg_inv_sqrt = deg.pow(-0.5)
+#         deg_inv_sqrt[torch.isinf(deg_inv_sqrt)] = 0.
 
-        adj_norm = deg_inv_sqrt.unsqueeze(1) * adj * deg_inv_sqrt.unsqueeze(0)
+#         adj_norm = deg_inv_sqrt.unsqueeze(1) * adj * deg_inv_sqrt.unsqueeze(0)
 
         return adj_norm
 
@@ -160,9 +160,12 @@ class BoundedGraphSAGE(nn.Module):
 	
     def embed(self, x, adj):
         # Compute normalization of the adjacency matrix
-        adj_norm = self.preprocess_adj(adj)
+        adj = adj + torch.eye(adj.shape[0], device=device)
+        deg = torch.sparse.sum(adj, dim=1).to_dense()
+        deg_inv_sqrt = deg.pow(-0.5)
+        deg_inv_sqrt[torch.isinf(deg_inv_sqrt)] = 0.
+        adj_norm = deg_inv_sqrt.unsqueeze(1) * adj * deg_inv_sqrt.unsqueeze(0)
         self.adj_norm = adj_norm
-        
         # Initialize node embeddings
         x = x.to(self.device)
         self.features = x
