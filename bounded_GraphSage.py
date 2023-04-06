@@ -8,72 +8,52 @@ from torch.nn.modules.module import Module
 from deeprobust.graph import utils
 from copy import deepcopy
 from sklearn.metrics import f1_score
-from deeprobust.graph.defense import GraphConvolution
-import warnings
-class GraphSageLayer(Module):
-    """GraphSAGE layer implementation based on https://arxiv.org/abs/1706.02216
-    """
 
-    def __init__(self, in_features, out_features, aggregator_type='mean', with_bias=True):
-        super(GraphSageLayer, self).__init__()
+class GraphSAGE(Module):
+    def __init__(self, in_features, out_features, agg_func='mean', bias=True):
+        super(GraphSAGE, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.aggregator_type = aggregator_type
-        
+        self.agg_func = agg_func
         self.weight = Parameter(torch.FloatTensor(in_features * 2, out_features))
-        
-        if with_bias:
+        if bias:
             self.bias = Parameter(torch.FloatTensor(out_features))
         else:
             self.register_parameter('bias', None)
-        
         self.reset_parameters()
 
     def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
-        self.weight.data.uniform_(-stdv, stdv)
+        torch.nn.init.xavier_uniform_(self.weight)
         if self.bias is not None:
-            self.bias.data.uniform_(-stdv, stdv)
+            self.bias.data.fill_(0)
 
-    def forward(self, input, adj):
-        """ GraphSAGE Layer forward function
-        """
-        if input.data.is_sparse:
-            input = input.to_dense()
-            
+    def forward(self, x, adj):
         adj = adj.to_dense()
-        
-        input_dim = input.shape[1]
-        neigh_dim = input.shape[1]
-        
-        # aggregate neighbor nodes' representations
-        if self.aggregator_type == 'mean':
-            agg_neigh = torch.matmul(adj, input) / torch.sum(adj, dim=1, keepdim=True)
-        elif self.aggregator_type == 'max':
-            agg_neigh, _ = torch.max(torch.matmul(adj, input), dim=1, keepdim=True)
+        if adj.dtype == torch.bool:
+            adj = adj.float()
+        h_neigh = torch.spmm(adj, x)
+        h_self = x
+        if self.agg_func == 'mean':
+            deg = adj.sum(1, keepdim=True)
+            deg_inv = deg.pow(-1)
+            deg_inv[deg_inv == float('inf')] = 0
+            h_neigh = torch.mm(deg_inv, h_neigh)
+            h_self = torch.mm(deg_inv, h_self)
         else:
-            raise ValueError('Invalid aggregator type.')
-        
-        # concatenate original node representations with the aggregated neighbor representations
-        concat = torch.cat([input, agg_neigh], dim=1)
-        
-        # perform linear transformation
-        support = torch.mm(concat, self.weight)
-        
-        # add bias term if applicable
+            h_neigh = F.normalize(h_neigh, p=1, dim=1)
+            h_self = F.normalize(h_self, p=1, dim=1)
+        h = torch.cat((h_self, h_neigh), dim=1)
+        h = torch.mm(h, self.weight)
         if self.bias is not None:
-            return support + self.bias
-        else:
-            return support
-
+            h = h + self.bias
+        return h
     def __repr__(self):
         return self.__class__.__name__ + ' (' \
                + str(self.in_features) + ' -> ' \
                + str(self.out_features) + ')'
 
 
-
-class BoundedGraphSAGE(nn.Module):
+class BoundedGraphSage(nn.Module):
     """ 2 Layer Graph Convolutional Network.
     Parameters
     ----------
@@ -115,20 +95,20 @@ class BoundedGraphSAGE(nn.Module):
     """
 
     def __init__(self, nfeat, nhid, nclass, dropout=0.5, lr=0.01, weight_decay=5e-4,
-                 with_relu=True, with_bias=True, device=None, bound=0):
+            with_relu=True, with_bias=True, device=None,bound=0 ):
 
-        super(BoundedGraphSAGE, self).__init__()
+        super(BoundedGCN, self).__init__()
 
         assert device is not None, "Please specify 'device'!"
         self.device = device
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.sage1 = GraphSageLayer(nfeat, nhid, with_bias=with_bias)
-        self.sage2 = GraphSageLayer(nhid, nclass, with_bias=with_bias)
+        self.gc1 = GraphSAGE(nfeat, nhid, with_bias=with_bias)
+        self.gc2 = GraphSAGE(nhid, nclass, with_bias=with_bias)
         self.dropout = dropout
         self.lr = lr
-        self.bound = bound
+        self.bound=bound
         if not with_relu:
             self.weight_decay = 0
         else:
@@ -140,66 +120,22 @@ class BoundedGraphSAGE(nn.Module):
         self.best_output = None
         self.adj_norm = None
         self.features = None
-    def preprocess_adj(adj, device):
-    
-#         adj = adj.to(device)
 
-    
-#         #adj = adj + torch.eye(adj.shape[0], device=device)
-
-    
-#         deg = torch.sparse.sum(adj, dim=1).to_dense()
-#         deg_inv_sqrt = deg.pow(-0.5)
-#         deg_inv_sqrt[torch.isinf(deg_inv_sqrt)] = 0.
-
-#         adj_norm = deg_inv_sqrt.unsqueeze(1) * adj * deg_inv_sqrt.unsqueeze(0)
-
-        return adj_norm
-
-
-	
-    def embed(self, x, adj):
-        # Compute normalization of the adjacency matrix
-        adj = adj + torch.eye(adj.shape[0])
-        deg = torch.sparse.sum(adj, dim=1).to_dense()
-        deg_inv_sqrt = deg.pow(-0.5)
-        deg_inv_sqrt[torch.isinf(deg_inv_sqrt)] = 0.
-        adj_norm = deg_inv_sqrt.unsqueeze(1) * adj * deg_inv_sqrt.unsqueeze(0)
-        self.adj_norm = adj_norm
-        # Initialize node embeddings
-        x = x.to(self.device)
-        self.features = x
-        
-        # Pass through GraphSage layers
-        x = self.sage1(x, adj_norm)
-        x = F.relu(x) if self.with_relu else x
-        x = F.dropout(x, p=self.dropout, training=self.training)
-
-        x = self.sage2(x, adj_norm)
-        x = F.relu(x) if self.with_relu else x
-        x = F.dropout(x, p=self.dropout, training=self.training)
-
-        # Apply bound to node embeddings
-        if self.bound > 0:
-            x = bounded_tensor(x, self.bound)
-
-        self.output = x
-        return x
     def forward(self, x, adj):
-        x = self.embed(x,adj)
-        for i in range(self.num_layers):
-           x = self.aggregators[i](adj, x)
-           x = self.activations[i](x)
-           x = F.dropout(x, p=self.dropout, training=self.training)
-           x = self.projector(x)
-        return F.log_softmax(x, dim=1)
+        if self.with_relu:
+            x = F.relu(self.gc1(x, adj))
+        else:
+            x = self.gc1(x, adj)
 
+        x = F.dropout(x, self.dropout, training=self.training)
+        x = self.gc2(x, adj)
+        return F.log_softmax(x, dim=1)
 
     def initialize(self):
         """Initialize parameters of GCN.
         """
-        self.sage1.reset_parameters()
-        self.sage2.reset_parameters()
+        self.gc1.reset_parameters()
+        self.gc2.reset_parameters()
 
     def fit(self, features, adj, labels, idx_train, idx_val=None, train_iters=200, initialize=True, verbose=False, normalize=True, patience=500, **kwargs):
         """Train the gcn model, when idx_val is not None, pick the best model according to the validation loss.
@@ -226,8 +162,8 @@ class BoundedGraphSAGE(nn.Module):
         patience : int
             patience for early stopping, only valid when `idx_val` is given
         """
-        print(" Using bounded GraphSAGE")
-        self.device = self.sage1.weight.device
+        print(" Using bounded gcn")
+        self.device = self.gc1.weight.device
         if initialize:
             self.initialize()
 
@@ -266,10 +202,10 @@ class BoundedGraphSAGE(nn.Module):
         for i in range(train_iters):
             optimizer.zero_grad()
             output = self.forward(self.features, self.adj_norm)
-            self.l2_reg = self.bound * torch.square(torch.norm(self.sage1.weight)) + torch.square(torch.norm(self.sage2.weight))  # Added by me
+            #self.l2_reg = self.bound * torch.square(torch.norm(self.gc1.weight)) + torch.square(torch.norm(self.gc2.weight))  # Added by me
 
             print(f'L2 reg at iteration {i} = {l2_reg}')
-            loss_train = F.nll_loss(output[idx_train], labels[idx_train]) + self.l2_reg
+            loss_train = F.nll_loss(output[idx_train], labels[idx_train]) + self.bound*self.l2_reg
             loss_train.backward()
             optimizer.step()
             if verbose and i % 10 == 0:
@@ -282,7 +218,7 @@ class BoundedGraphSAGE(nn.Module):
     def _train_with_val(self, labels, idx_train, idx_val, train_iters, verbose):
         print("Training with val")
         if verbose:
-            print('=== training GraphSAGE model ===')
+            print('=== training gcn model ===')
         optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
         best_loss_val = 100
@@ -293,12 +229,12 @@ class BoundedGraphSAGE(nn.Module):
             optimizer.zero_grad()
             output = self.forward(self.features, self.adj_norm)
 
-            self.l2_reg = 2 * self.bound * (torch.log(torch.norm(self.sage1.weight)) + torch.log(torch.norm(self.sage2.weight)) )    # Added by me
+            self.l2_reg = 2 * self.bound * (torch.log(torch.norm(self.gc1.weight)) + torch.log(torch.norm(self.gc2.weight)) )    # Added by me
 
             if self.l2_reg<0:
                 self.l2_reg=0
 
-            loss_train = F.nll_loss(output[idx_train], labels[idx_train]) + self.l2_reg
+            loss_train = F.nll_loss(output[idx_train], labels[idx_train]) + self.bound*self.l2_reg
 
             if i%10==0:
                 print(f'l2 Reg = {self.l2_reg} , Loss = {loss_train}')
@@ -331,7 +267,7 @@ class BoundedGraphSAGE(nn.Module):
     def _train_with_early_stopping(self, labels, idx_train, idx_val, train_iters, patience, verbose):
         print("Training with early stopping")
         if verbose:
-            print('=== training GraphSAGE model ===')
+            print('=== training gcn model ===')
         optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
         early_stopping = patience
