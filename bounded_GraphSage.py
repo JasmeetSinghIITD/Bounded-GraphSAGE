@@ -97,7 +97,7 @@ class BoundedGraphSage(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout=0.5, lr=0.01, weight_decay=5e-4,
             with_relu=True, with_bias=True, device=None,bound=0 ):
 
-        super(BoundedGCN, self).__init__()
+        super(BoundedGraphSage, self).__init__()
 
         assert device is not None, "Please specify 'device'!"
         self.device = device
