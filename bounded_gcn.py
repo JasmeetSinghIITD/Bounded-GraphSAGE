@@ -9,39 +9,46 @@ from deeprobust.graph import utils
 from copy import deepcopy
 from sklearn.metrics import f1_score
 
-class GraphConvolution(Module):
-    """Simple GCN layer, similar to https://github.com/tkipf/pygcn
-    """
-
-    def __init__(self, in_features, out_features, with_bias=True):
-        super(GraphConvolution, self).__init__()
+class GraphSageLayer(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(GraphSageLayer, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = Parameter(torch.FloatTensor(in_features, out_features))
-        if with_bias:
-            self.bias = Parameter(torch.FloatTensor(out_features))
-        else:
-            self.register_parameter('bias', None)
+        self.linear = nn.Linear(in_features*2, out_features)
+        self.activation = F.relu
+        
+        # Initialize parameters
         self.reset_parameters()
 
     def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
-        self.weight.data.uniform_(-stdv, stdv)
-        if self.bias is not None:
-            self.bias.data.uniform_(-stdv, stdv)
+        nn.init.xavier_uniform_(self.linear.weight[:self.in_features])
+        nn.init.xavier_uniform_(self.linear.weight[self.in_features:])
+        nn.init.zeros_(self.linear.bias)
 
-    def forward(self, input, adj):
-        """ Graph Convolutional Layer forward function
+    def forward(self, nodes, adj_list):
         """
-        if input.data.is_sparse:
-            support = torch.spmm(input, self.weight)
-        else:
-            support = torch.mm(input, self.weight)
-        output = torch.spmm(adj, support)
-        if self.bias is not None:
-            return output + self.bias
-        else:
-            return output
+        nodes: list of nodes in the batch
+        adj_list: adjacency list for the batch
+        """
+        # Aggregate neighbor embeddings
+        neighbor_embeddings = []
+        for node in nodes:
+            neighbors = adj_list[node]
+            if len(neighbors) > 0:
+                neighbor_embeddings.append(torch.mean(neighbors, dim=0))
+            else:
+                neighbor_embeddings.append(torch.zeros(self.in_features))
+
+        neighbor_embeddings = torch.stack(neighbor_embeddings)
+
+        # Concatenate node features and aggregated neighbor embeddings
+        input_embeddings = torch.cat([neighbor_embeddings, self.linear.weight[:self.in_features].unsqueeze(0).repeat(len(nodes), 1)], dim=1)
+
+        # Apply linear transformation and activation function
+        output_embeddings = self.linear(input_embeddings)
+        output_embeddings = self.activation(output_embeddings)
+
+        return output_embeddings
 
     def __repr__(self):
         return self.__class__.__name__ + ' (' \
@@ -50,7 +57,7 @@ class GraphConvolution(Module):
 
 
 class BoundedGCN(nn.Module):
-    """ 2 Layer Graph Convolutional Network.
+    """ 2 Layer GraphSage.
     Parameters
     ----------
     nfeat : int
@@ -100,8 +107,8 @@ class BoundedGCN(nn.Module):
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = GraphConvolution(nfeat, nhid, with_bias=with_bias)
-        self.gc2 = GraphConvolution(nhid, nclass, with_bias=with_bias)
+        self.gc1 = GraphSageLayer(nfeat, nhid)
+        self.gc2 = GraphSageLayer(nhid, nclass)
         self.dropout = dropout
         self.lr = lr
         self.bound=bound
