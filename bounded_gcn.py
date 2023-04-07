@@ -9,44 +9,80 @@ from deeprobust.graph import utils
 from copy import deepcopy
 from sklearn.metrics import f1_score
 
-class GraphConvolution(Module):
-    """Simple GCN layer, similar to https://github.com/tkipf/pygcn
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.nn.parameter import Parameter
+
+class GraphSageLayer(nn.Module):
+    """
+    Implementation of the GraphSAGE layer in PyTorch.
     """
 
-    def __init__(self, in_features, out_features, with_bias=True):
-        super(GraphConvolution, self).__init__()
-        self.in_features = in_features
-        self.out_features = out_features
-        self.weight = Parameter(torch.FloatTensor(in_features, out_features))
-        if with_bias:
-            self.bias = Parameter(torch.FloatTensor(out_features))
+    def __init__(self, in_feats, out_feats, aggregator='mean', bias=True):
+        """
+        Initialize the GraphSAGE layer.
+
+        Args:
+            in_feats (int): Number of input features.
+            out_feats (int): Number of output features.
+            aggregator (str): Aggregator type to use (either 'mean' or 'pool').
+            bias (bool): Whether or not to include a bias term.
+        """
+        super(GraphSageLayer, self).__init__()
+        self.in_feats = in_feats
+        self.out_feats = out_feats
+        self.aggregator = aggregator
+        self.weight = Parameter(torch.FloatTensor(in_feats * (2 if aggregator == 'pool' else 1), out_feats))
+        if bias:
+            self.bias = Parameter(torch.FloatTensor(out_feats))
         else:
-            self.register_parameter('bias', None)
+            self.bias = None
         self.reset_parameters()
 
     def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
-        self.weight.data.uniform_(-stdv, stdv)
-        if self.bias is not None:
-            self.bias.data.uniform_(-stdv, stdv)
-
-    def forward(self, input, adj):
-        """ Graph Convolutional Layer forward function
         """
-        if input.data.is_sparse:
-            support = torch.spmm(input, self.weight)
-        else:
-            support = torch.mm(input, self.weight)
-        output = torch.spmm(adj, support)
+        Reset the layer's parameters to random values.
+        """
+        nn.init.xavier_uniform_(self.weight)
         if self.bias is not None:
-            return output + self.bias
+            nn.init.zeros_(self.bias)
+
+    def forward(self, x, adj):
+        """
+        Perform a forward pass of the GraphSAGE layer.
+
+        Args:
+            x (torch.Tensor): Input node features of shape (num_nodes, in_feats).
+            adj (torch.Tensor): Sparse adjacency matrix of shape (num_nodes, num_nodes).
+
+        Returns:
+            The output tensor of shape (num_nodes, out_feats).
+        """
+        if self.aggregator == 'mean':
+            # Mean aggregator
+            nei_feats = torch.sparse.mm(adj, x)
+            new_feats = torch.cat([x, nei_feats], dim=1)
+            out = torch.mm(new_feats, self.weight)
+        elif self.aggregator == 'pool':
+            # Max-pool aggregator
+            nei_feats = torch.sparse.mm(adj, x)
+            pool_feats = torch.max(nei_feats, dim=0)[0]
+            new_feats = torch.cat([x, pool_feats], dim=1)
+            out = torch.mm(new_feats, self.weight)
         else:
-            return output
+            raise ValueError('Invalid aggregator type')
+
+        if self.bias is not None:
+            out = out + self.bias
+        return F.relu(out)
 
     def __repr__(self):
-        return self.__class__.__name__ + ' (' \
-               + str(self.in_features) + ' -> ' \
-               + str(self.out_features) + ')'
+        """
+        Return a string representation of the layer.
+        """
+        return f'{self.__class__.__name__} ({self.in_feats} -> {self.out_feats})'
+
 
 
 class BoundedGCN(nn.Module):
@@ -100,8 +136,8 @@ class BoundedGCN(nn.Module):
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = GraphConvolution(nfeat, nhid, with_bias=with_bias)
-        self.gc2 = GraphConvolution(nhid, nclass, with_bias=with_bias)
+        self.gc1 = GraphSageLayer(nfeat, nhid, with_bias=with_bias)
+        self.gc2 = GraphSageLayer(nhid, nclass, with_bias=with_bias)
         self.dropout = dropout
         self.lr = lr
         self.bound=bound
