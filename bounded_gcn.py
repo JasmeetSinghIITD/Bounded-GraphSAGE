@@ -19,7 +19,7 @@ class GraphSageLayer(nn.Module):
     Implementation of the GraphSAGE layer in PyTorch.
     """
 
-    def __init__(self, in_feats, out_feats, aggregator='mean', bias=True):
+    def __init__(self, in_feats, out_feats, aggregator='mean', with_bias=True):
         """
         Initialize the GraphSAGE layer.
 
@@ -34,7 +34,7 @@ class GraphSageLayer(nn.Module):
         self.out_feats = out_feats
         self.aggregator = aggregator
         self.weight = Parameter(torch.FloatTensor(in_feats * (2 if aggregator == 'pool' else 1), out_feats))
-        if bias:
+        if with_bias=True:
             self.bias = Parameter(torch.FloatTensor(out_feats))
         else:
             self.bias = None
