@@ -34,7 +34,7 @@ class GraphSageLayer(nn.Module):
         self.out_feats = out_feats
         self.aggregator = aggregator
         self.weight = Parameter(torch.FloatTensor(in_feats * (2 if aggregator == 'pool' else 1), out_feats))
-        if with_bias=True:
+        if with_bias:
             self.bias = Parameter(torch.FloatTensor(out_feats))
         else:
             self.bias = None
