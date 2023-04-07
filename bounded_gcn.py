@@ -19,7 +19,7 @@ class GraphSageLayer(nn.Module):
     Implementation of the GraphSAGE layer in PyTorch.
     """
 
-    def __init__(self, in_feats, out_feats, aggregator='mean', with_bias=True):
+    def __init__(self, in_feats, out_feats, aggregator='pool', with_bias=True):
         """
         Initialize the GraphSAGE layer.
 
