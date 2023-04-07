@@ -166,7 +166,7 @@ class BoundedGCN(nn.Module):
             patience for early stopping, only valid when `idx_val` is given
         """
         print(" Using bounded gcn")
-        self.device = self.gc1.weight.device
+        self.device = self.gc1.linear.weight.device
         if initialize:
             self.initialize()
 
@@ -232,7 +232,7 @@ class BoundedGCN(nn.Module):
             optimizer.zero_grad()
             output = self.forward(self.features, self.adj_norm)
 
-            self.l2_reg = 2 * self.bound * (torch.log(torch.norm(self.gc1.weight)) + torch.log(torch.norm(self.gc2.weight)) )    # Added by me
+            self.l2_reg = 2 * self.bound * (torch.log(torch.norm(self.gc1.linear.weight)) + torch.log(torch.norm(self.gc2.linear.weight)) )    # Added by me
 
             if self.l2_reg<0:
                 self.l2_reg=0
