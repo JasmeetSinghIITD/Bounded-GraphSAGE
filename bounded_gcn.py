@@ -167,7 +167,7 @@ class BoundedGCN(nn.Module):
             patience for early stopping, only valid when `idx_val` is given
         """
         print(" Using bounded gcn")
-        self.device = self.gc1.weight.device
+        self.device = self.gc1.lin_l.weight.device
         if initialize:
             self.initialize()
 
@@ -206,7 +206,7 @@ class BoundedGCN(nn.Module):
         for i in range(train_iters):
             optimizer.zero_grad()
             output = self.forward(self.features, self.adj_norm)
-            #self.l2_reg = self.bound * torch.square(torch.norm(self.gc1.weight)) + torch.square(torch.norm(self.gc2.weight))  # Added by me
+            self.l2_reg = self.bound * (torch.square(torch.norm(self.gc1.lin_l.weight)) + torch.square(torch.norm(self.gc2.lin_l.weight))+torch.square(torch.norm(self.gc1.lin_r.weight)) + torch.square(torch.norm(self.gc2.lin_r.weight)))  # Added by me
 
             print(f'L2 reg at iteration {i} = {l2_reg}')
             loss_train = F.nll_loss(output[idx_train], labels[idx_train]) + self.bound*self.l2_reg
@@ -233,7 +233,7 @@ class BoundedGCN(nn.Module):
             optimizer.zero_grad()
             output = self.forward(self.features, self.adj_norm)
 
-            self.l2_reg = 2 * self.bound * (torch.log(torch.norm(self.gc1.weight)) + torch.log(torch.norm(self.gc2.weight)) )    # Added by me
+            self.l2_reg = self.bound * (torch.square(torch.norm(self.gc1.lin_l.weight)) + torch.square(torch.norm(self.gc2.lin_l.weight))+torch.square(torch.norm(self.gc1.lin_r.weight)) + torch.square(torch.norm(self.gc2.lin_r.weight)))  # Added by me
 
             if self.l2_reg<0:
                 self.l2_reg=0
