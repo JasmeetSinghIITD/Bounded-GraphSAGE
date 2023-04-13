@@ -118,7 +118,7 @@ class BoundedGCN(nn.Module):
         else:
             self.weight_decay = weight_decay
         self.with_relu = with_relu
-        self.with_bias = false
+        self.with_bias = 'false'
         self.output = None
         self.best_model = None
         self.best_output = None
