@@ -9,39 +9,47 @@ from deeprobust.graph import utils
 from copy import deepcopy
 from sklearn.metrics import f1_score
 
-class GraphConvolution(Module):
-    """Simple GCN layer, similar to https://github.com/tkipf/pygcn
+class GraphSageLayer(torch.nn.Module):
+    """
+    Implementation of a GraphSAGE layer in PyTorch.
     """
 
-    def __init__(self, in_features, out_features, with_bias=True):
-        super(GraphConvolution, self).__init__()
-        self.in_features = in_features
-        self.out_features = out_features
-        self.weight = Parameter(torch.FloatTensor(in_features, out_features))
-        if with_bias:
-            self.bias = Parameter(torch.FloatTensor(out_features))
-        else:
-            self.register_parameter('bias', None)
+    def __init__(self, in_feats, out_feats, agg_func='mean'):
+        super(GraphSageLayer, self).__init__()
+
+        self.in_feats = in_feats
+        self.out_feats = out_feats
+        self.agg_func = agg_func
+
+        # Define the linear layers for the forward propagation
+        self.lin_l = nn.Linear(self.in_feats, self.out_feats, bias=False)
+        self.lin_r = nn.Linear(self.in_feats, self.out_feats, bias=False)
+
+        # Initialize the parameters
         self.reset_parameters()
 
     def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
-        self.weight.data.uniform_(-stdv, stdv)
-        if self.bias is not None:
-            self.bias.data.uniform_(-stdv, stdv)
+        # Initialize the weights of the linear layers
+        gain = nn.init.calculate_gain('relu')
+        nn.init.xavier_normal_(self.lin_l.weight, gain=gain)
+        nn.init.xavier_normal_(self.lin_r.weight, gain=gain)
 
-    def forward(self, input, adj):
-        """ Graph Convolutional Layer forward function
-        """
-        if input.data.is_sparse:
-            support = torch.spmm(input, self.weight)
+    def forward(self, x, adj):
+        # Compute the mean or max neighborhood representation
+        if self.agg_func == 'mean':
+            agg = torch.sparse.mm(adj, x) / torch.sparse.sum(adj, dim=1).unsqueeze(1)
+        elif self.agg_func == 'max':
+            agg = torch.sparse.mm(adj, x)
+            agg, _ = torch.sparse.max(agg, dim=1, keepdim=True)
         else:
-            support = torch.mm(input, self.weight)
-        output = torch.spmm(adj, support)
-        if self.bias is not None:
-            return output + self.bias
-        else:
-            return output
+            raise NotImplementedError
+
+        # Compute the left and right output representations
+        left = self.lin_l(x)
+        right = self.lin_r(agg)
+        out = torch.relu(left + right)
+
+        return out
 
     def __repr__(self):
         return self.__class__.__name__ + ' (' \
@@ -100,8 +108,8 @@ class BoundedGCN(nn.Module):
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = GraphConvolution(nfeat, nhid, with_bias=with_bias)
-        self.gc2 = GraphConvolution(nhid, nclass, with_bias=with_bias)
+        self.gc1 = GraphSageLayer(nfeat, nhid, with_bias=with_bias)
+        self.gc2 = GraphSageLayer(nhid, nclass, with_bias=with_bias)
         self.dropout = dropout
         self.lr = lr
         self.bound=bound
