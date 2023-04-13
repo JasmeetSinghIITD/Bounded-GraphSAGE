@@ -108,8 +108,8 @@ class BoundedGCN(nn.Module):
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = GraphSageLayer(nfeat, nhid, with_bias=with_bias)
-        self.gc2 = GraphSageLayer(nhid, nclass, with_bias=with_bias)
+        self.gc1 = GraphSageLayer(nfeat, nhid)
+        self.gc2 = GraphSageLayer(nhid, nclass)
         self.dropout = dropout
         self.lr = lr
         self.bound=bound
@@ -118,7 +118,7 @@ class BoundedGCN(nn.Module):
         else:
             self.weight_decay = weight_decay
         self.with_relu = with_relu
-        self.with_bias = with_bias
+        self.with_bias = false
         self.output = None
         self.best_model = None
         self.best_output = None
