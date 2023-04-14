@@ -130,7 +130,7 @@ class BoundedGCN(nn.Module):
             Data(features, torch.stack(adj.nonzero(as_tuple = True), dim = 0)),
             num_neighbors=[5, 10],
             batch_size=16,
-            input_nodes=features.train_mask,
+            input_nodes=features,
         )
         self.edge_index = features, 
         if type(features) is not torch.Tensor:
