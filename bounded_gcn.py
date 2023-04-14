@@ -9,7 +9,7 @@ from deeprobust.graph import utils
 from copy import deepcopy
 from sklearn.metrics import f1_score
 from torch_geometric.loader import NeighborLoader
-from torch.geometric.data import Data
+from torch_geometric.data import Data
 from torch_geometric.nn.conv import SAGEConv
 
 class BoundedGCN(nn.Module):
