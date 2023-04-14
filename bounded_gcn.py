@@ -11,7 +11,7 @@ from sklearn.metrics import f1_score
 from torch_geometric.loader import NeighborLoader
 from torch_geometric.data import Data
 from torch_geometric.nn.conv import SAGEConv
-import torch-sparse
+import torch_sparse
 
 class BoundedGCN(nn.Module):
     """ 2 Layer Graph Convolutional Network.
