@@ -82,10 +82,10 @@ class BoundedGCN(nn.Module):
         
     
     def forward(self, x, edge_index):
-        h = self.sage1(x, edge_index)
+        h = self.sg1(x, edge_index)
         h = torch.relu(h)
         h = F.dropout(h, p=0.5, training=self.training)
-        h = self.sage2(h, edge_index)
+        h = self.sg2(h, edge_index)
         return h, F.log_softmax(h, dim=1)
 
     def initialize(self):
