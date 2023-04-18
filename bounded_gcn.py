@@ -58,7 +58,7 @@ class GraphSAGE(nn.Module):
             out = torch.mm(concat, self.weight)
             if self.bias is not None:
                out = out + self.bias
-       return out
+        return out
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.in_features*2}, {self.out_features}, aggr_method={self.aggr_method})'
