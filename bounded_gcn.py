@@ -28,8 +28,8 @@ class GraphSAGE(nn.Module):
         if self.bias is not None:
             nn.init.zeros_(self.bias)
 
-    def forward(self, x, edge_index):
-        row, col = edge_index
+    def forward(self, x, adj):
+	rows, cols = torch.nonzero(adj, as_tuple=True)
         if self.aggr_method == 'mean':
             # Compute mean aggregation of neighbor nodes
             neighbor_mean = torch.sparse.FloatTensor(row, col, torch.ones_like(row, dtype=torch.float32), 
@@ -109,8 +109,8 @@ class BoundedGCN(nn.Module):
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = GraphConvolution(nfeat, nhid, with_bias=with_bias)
-        self.gc2 = GraphConvolution(nhid, nclass, with_bias=with_bias)
+        self.gc1 = GraphSAGE(nfeat, nhid, aggr_method='mean', with_bias=with_bias)
+        self.gc2 = GraphSAGE(nhid, nclass, aggr_method='mean', with_bias=with_bias)
         self.dropout = dropout
         self.lr = lr
         self.bound=bound
@@ -127,6 +127,7 @@ class BoundedGCN(nn.Module):
         self.features = None
 
     def forward(self, x, adj):
+	
         if self.with_relu:
             x = F.relu(self.gc1(x, adj))
         else:
@@ -210,7 +211,7 @@ class BoundedGCN(nn.Module):
             #self.l2_reg = self.bound * torch.square(torch.norm(self.gc1.weight)) + torch.square(torch.norm(self.gc2.weight))  # Added by me
 
             print(f'L2 reg at iteration {i} = {l2_reg}')
-            loss_train = F.nll_loss(output[idx_train], labels[idx_train]) + self.bound*self.l2_reg
+            loss_train = F.nll_loss(output[idx_train], labels[idx_train]) #+ self.bound*self.l2_reg
             loss_train.backward()
             optimizer.step()
             if verbose and i % 10 == 0:
