@@ -43,7 +43,7 @@ class GraphSAGE(nn.Module):
         else:
             size = (x.shape[0], x.shape[0])
             device = x.device
-            neighbor_max = torch.sparse.FloatTensor(size, device='cpu')
+            neighbor_max = torch.FloatTensor(size)
 
 	    # Populate the sparse tensor with values
             indices = (row, col)
