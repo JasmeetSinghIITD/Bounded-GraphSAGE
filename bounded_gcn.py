@@ -10,59 +10,79 @@ from copy import deepcopy
 from sklearn.metrics import f1_score
 
 
+
 class GraphSAGE(nn.Module):
-    def __init__(self, in_features, out_features, aggr_method='mean', with_bias=True):
+    """ GraphSAGE layer implementation
+    """
+    def __init__(self, in_feats, out_feats, aggregator_type='mean'):
         super(GraphSAGE, self).__init__()
-        self.in_features = in_features
-        self.out_features = out_features
-        self.aggr_method = aggr_method
-        self.weight = Parameter(torch.FloatTensor(in_features*2, out_features))
-        if with_bias:
-            self.bias = Parameter(torch.FloatTensor(out_features))
+
+        self.in_feats = in_feats
+        self.out_feats = out_feats
+        self.aggregator_type = aggregator_type
+
+        if aggregator_type == 'mean':
+            self.aggregator = MeanAggregator(in_feats, out_feats)
+        elif aggregator_type == 'maxpool':
+            self.aggregator = MaxPoolAggregator(in_feats, out_feats)
         else:
-            self.register_parameter('bias', None)
-        self.reset_parameters()
+            raise ValueError("Aggregator type {} not recognized".format(aggregator_type))
 
-    def reset_parameters(self):
-        nn.init.xavier_uniform_(self.weight)
-        if self.bias is not None:
-            nn.init.zeros_(self.bias)
+    def forward(self, nodes, adj):
+        """ GraphSAGE Layer forward function
+        """
+        neigh_feats = adj @ nodes
+        output = self.aggregator(neigh_feats)
+        return output
 
-    def forward(self, x, adj):
-        row,col = adj.nonzero(as_tuple=True)
-	
-        if self.aggr_method == 'mean':
-            # Compute mean aggregation of neighbor nodes
-            neighbor_mean = torch.sparse.FloatTensor((row, col),torch.ones_like(row, dtype=torch.float32),(x.shape[0], x.shape[0])).to(x.device)
-            neighbor_count = neighbor_mean @ x
-            neighbor_count = torch.clamp(neighbor_count, min=1)
-            neighbor_sum = neighbor_mean @ (x + self.bias)
-            neighbor_mean = neighbor_sum / neighbor_count
-            concat = torch.cat([x, neighbor_mean], dim=-1)
-            out = torch.mm(concat, self.weight)
-        else:
-            size = (x.shape[0], x.shape[0])
-            device = x.device
-            neighbor_max = torch.FloatTensor(size)
 
-	    # Populate the sparse tensor with values
-            indices = (row, col)
-            indices_tensor = torch.tensor(indices)
+class MeanAggregator(nn.Module):
+    """ Mean aggregator implementation for GraphSAGE
+    """
+    def __init__(self, in_feats, out_feats):
+        super(MeanAggregator, self).__init__()
 
-            values = torch.ones_like(row, dtype=torch.float32)
-            neighbor_max = torch.sparse.FloatTensor(indices_tensor, values, size, device=device)
-            neighbor_max = neighbor_max.coalesce()
-            neighbor_max.values()[row == col] = 0
-            neighbor_max = neighbor_max.sparse_mask(row != col)
-            neighbor_max, _ = torch.max(neighbor_max @ x, dim=-2)
-            concat = torch.cat([x, neighbor_max], dim=-1)
-            out = torch.mm(concat, self.weight)
-            if self.bias is not None:
-               out = out + self.bias
-        return out
+        self.in_feats = in_feats
+        self.out_feats = out_feats
 
-    def __repr__(self):
-        return f'{self.__class__.__name__}({self.in_features*2}, {self.out_features}, aggr_method={self.aggr_method})'
+        self.linear = nn.Linear(in_feats + out_feats, out_feats)
+
+    def forward(self, neigh_feats):
+        """ Mean aggregator forward function
+        """
+        num_nodes = neigh_feats.shape[0]
+        h_neigh = neigh_feats.sum(dim=0) / num_nodes
+        h_self = torch.zeros(num_nodes, self.in_feats)
+        if neigh_feats.is_cuda:
+            h_self = h_self.cuda()
+        h = torch.cat([h_self, h_neigh], dim=1)
+        output = F.relu(self.linear(h))
+        return output
+
+
+class MaxPoolAggregator(nn.Module):
+    """ Maxpool aggregator implementation for GraphSAGE
+    """
+    def __init__(self, in_feats, out_feats):
+        super(MaxPoolAggregator, self).__init__()
+
+        self.in_feats = in_feats
+        self.out_feats = out_feats
+
+        self.linear = nn.Linear(in_feats * 2, out_feats)
+
+    def forward(self, neigh_feats):
+        """ Maxpool aggregator forward function
+        """
+        num_nodes = neigh_feats.shape[0]
+        h_neigh, _ = torch.max(neigh_feats, dim=0)
+        h_self = torch.zeros(num_nodes, self.in_feats)
+        if neigh_feats.is_cuda:
+            h_self = h_self.cuda()
+        h = torch.cat([h_self, h_neigh], dim=1)
+        output = F.relu(self.linear(h))
+        return output
+
 
 
 class BoundedGCN(nn.Module):
