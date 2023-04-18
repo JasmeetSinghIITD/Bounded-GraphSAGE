@@ -136,8 +136,8 @@ class BoundedGCN(nn.Module):
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = GraphSAGE(nfeat, nhid, aggr_method='max', with_bias=with_bias)
-        self.gc2 = GraphSAGE(nhid, nclass, aggr_method='max', with_bias=with_bias)
+        self.gc1 = GraphSAGE(nfeat, nhid, aggregator_type='max')
+        self.gc2 = GraphSAGE(nhid, nclass, aggregator_type='max')
         self.dropout = dropout
         self.lr = lr
         self.bound=bound
