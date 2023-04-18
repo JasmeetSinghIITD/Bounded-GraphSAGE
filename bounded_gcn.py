@@ -43,7 +43,7 @@ class GraphSAGE(nn.Module):
         else:
             # Compute max aggregation of neighbor nodes
             size=(x.shape[0], x.shape[0])
-            print(size)
+            print(type(size))
             neighbor_max = torch.sparse.FloatTensor(row, col, torch.ones_like(row, dtype=torch.float32), size=(x.shape[0], x.shape[0])).to(x.device)
             neighbor_max = neighbor_max.coalesce()
             neighbor_max.values()[row == col] = 0
