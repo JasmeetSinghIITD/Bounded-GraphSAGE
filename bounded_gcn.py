@@ -30,7 +30,7 @@ class GraphSAGE(nn.Module):
 
     def forward(self, x, adj):
         row,col = adj.nonzero(as_tuple=True)
-        par1 = tuple(torch.tensor(row)),tuple(torch.tensor(col))
+	
         print("1: ",type(par1),"2: ",type(torch.ones_like(row, dtype=torch.float32)),"3 ",type((x.shape[0], x.shape[0])))
         if self.aggr_method == 'mean':
             # Compute mean aggregation of neighbor nodes
@@ -42,8 +42,14 @@ class GraphSAGE(nn.Module):
             concat = torch.cat([x, neighbor_mean], dim=-1)
             out = torch.mm(concat, self.weight)
         else:
-            # Compute max aggregation of neighbor nodes
-            neighbor_max = torch.sparse.FloatTensor((row, col),torch.ones_like(row, dtype=torch.float32),(x.shape[0], x.shape[0])).to(x.device)
+	    size = (x.shape[0], x.shape[0])
+	    device = x.device
+            neighbor_max = torch.sparse.FloatTensor(size, device=device)
+
+	    # Populate the sparse tensor with values
+	    indices = (row, col)
+	    values = torch.ones_like(row, dtype=torch.float32)
+	    neighbor_max = torch.sparse.FloatTensor(indices, values, size, device=device)
             neighbor_max = neighbor_max.coalesce()
             neighbor_max.values()[row == col] = 0
             neighbor_max = neighbor_max.sparse_mask(row != col)
