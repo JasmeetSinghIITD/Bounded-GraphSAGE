@@ -30,7 +30,7 @@ class GraphSAGE(nn.Module):
 
     def forward(self, x, adj):
         row,col = adj.nonzero(as_tuple=True)
-	par1 = tuple(torch.tensor(row) ,torch.tensor(col))
+        par1 = tuple(torch.tensor(row) ,torch.tensor(col))
         print("1: ",type((row, col)),"2: ",type(torch.ones_like(row, dtype=torch.float32)),"3 ",type((x.shape[0], x.shape[0])))
         if self.aggr_method == 'mean':
             # Compute mean aggregation of neighbor nodes
