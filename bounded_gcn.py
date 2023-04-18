@@ -42,7 +42,7 @@ class GraphSAGE(nn.Module):
             concat = torch.cat([x, neighbor_mean], dim=-1)
             out = torch.mm(concat, self.weight)
         else:
-	    size = (x.shape[0], x.shape[0])
+            size = (x.shape[0], x.shape[0])
 	    device = x.device
             neighbor_max = torch.sparse.FloatTensor(size, device=device)
 
