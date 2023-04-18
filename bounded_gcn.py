@@ -43,13 +43,13 @@ class GraphSAGE(nn.Module):
             out = torch.mm(concat, self.weight)
         else:
             size = (x.shape[0], x.shape[0])
-	    device = x.device
+            device = x.device
             neighbor_max = torch.sparse.FloatTensor(size, device=device)
 
 	    # Populate the sparse tensor with values
-	    indices = (row, col)
-	    values = torch.ones_like(row, dtype=torch.float32)
-	    neighbor_max = torch.sparse.FloatTensor(indices, values, size, device=device)
+            indices = (row, col)
+            values = torch.ones_like(row, dtype=torch.float32)
+            neighbor_max = torch.sparse.FloatTensor(indices, values, size, device=device)
             neighbor_max = neighbor_max.coalesce()
             neighbor_max.values()[row == col] = 0
             neighbor_max = neighbor_max.sparse_mask(row != col)
@@ -57,8 +57,8 @@ class GraphSAGE(nn.Module):
             concat = torch.cat([x, neighbor_max], dim=-1)
             out = torch.mm(concat, self.weight)
             if self.bias is not None:
-                out = out + self.bias
-        return out
+               out = out + self.bias
+       return out
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.in_features*2}, {self.out_features}, aggr_method={self.aggr_method})'
