@@ -32,7 +32,7 @@ class GraphSAGE(nn.Module):
         row,col = torch.nonzero(adj, as_tuple=True)
         if self.aggr_method == 'mean':
             # Compute mean aggregation of neighbor nodes
-            neighbor_mean = torch.sparse.FloatTensor(row, col, torch.ones_like(row, dtype=torch.float32), size=tuple(x.shape[0], x.shape[0])).to(x.device)
+            neighbor_mean = torch.sparse.FloatTensor(row, col, torch.ones_like(row, dtype=torch.float32), size=(tuple(x.shape[0]), tuple(x.shape[0]))).to(x.device)
             neighbor_count = neighbor_mean @ x
             neighbor_count = torch.clamp(neighbor_count, min=1)
             neighbor_sum = neighbor_mean @ (x + self.bias)
