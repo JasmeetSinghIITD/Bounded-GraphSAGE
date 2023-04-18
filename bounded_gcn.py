@@ -55,6 +55,7 @@ class MeanAggregator(nn.Module):
         h_self = torch.zeros(num_nodes, self.in_feats)
         if neigh_feats.is_cuda:
             h_self = h_self.cuda()
+        h_neigh = h_neigh.unsqueeze(0)  # add second dimension
         h = torch.cat([h_self, h_neigh], dim=1)
         output = F.relu(self.linear(h))
         return output
