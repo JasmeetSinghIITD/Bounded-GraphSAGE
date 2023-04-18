@@ -51,12 +51,14 @@ class MeanAggregator(nn.Module):
         """ Mean aggregator forward function
         """
         num_nodes = neigh_feats.shape[0]
-        h_neigh = neigh_feats.sum(dim=0) / num_nodes
+        if neigh_feats.numel() == 0:  # check if neigh_feats is empty
+            h_neigh = torch.zeros(1, self.out_feats)
+        else:
+            h_neigh = neigh_feats.sum(dim=0) / num_nodes
         h_self = torch.zeros(num_nodes, self.in_feats)
         if neigh_feats.is_cuda:
             h_self = h_self.cuda()
-        h_neigh = h_neigh.unsqueeze(0)  # add second dimension
-        h = torch.cat([h_self, h_neigh], dim=1)
+        h = torch.cat([h_self, h_neigh.expand(num_nodes, -1)], dim=1)
         output = F.relu(self.linear(h))
         return output
 
