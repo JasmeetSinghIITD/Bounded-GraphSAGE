@@ -157,15 +157,10 @@ class BoundedGCN(nn.Module):
         self.features = None
 
     def forward(self, x, adj):
-	
-        if self.with_relu:
-            x = F.relu(self.gc1(x, adj))
-        else:
-            x = self.gc1(x, adj)
-
-        x = F.dropout(x, self.dropout, training=self.training)
-        x = self.gc2(x, adj)
-        return F.log_softmax(x, dim=1)
+        h = self.gc1(x, adj)
+        h = F.relu(h)
+        h = self.gc2(h, adj)
+        return h
 
     def initialize(self):
         """Initialize parameters of GCN.
