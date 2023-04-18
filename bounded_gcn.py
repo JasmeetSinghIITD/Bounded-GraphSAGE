@@ -30,8 +30,7 @@ class GraphSAGE(nn.Module):
 
     def forward(self, x, adj):
         row,col = torch.nonzero(adj, as_tuple=True)
-        row=row.tolist()
-        print('row',row)
+        print(type(row))
         if self.aggr_method == 'mean':
             # Compute mean aggregation of neighbor nodes
             neighbor_mean = torch.sparse.FloatTensor(row, col, torch.ones_like(row, dtype=torch.float32), size=(tuple(x.shape[0]), tuple(x.shape[0]))).to(x.device)
