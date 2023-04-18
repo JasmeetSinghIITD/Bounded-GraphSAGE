@@ -47,8 +47,10 @@ class GraphSAGE(nn.Module):
 
 	    # Populate the sparse tensor with values
             indices = (row, col)
+            indices_tensor = torch.tensor(indices)
+
             values = torch.ones_like(row, dtype=torch.float32)
-            neighbor_max = torch.sparse.FloatTensor(indices, values, size, device=device)
+            neighbor_max = torch.sparse.FloatTensor(indices_tensor, values, size, device=device)
             neighbor_max = neighbor_max.coalesce()
             neighbor_max.values()[row == col] = 0
             neighbor_max = neighbor_max.sparse_mask(row != col)
