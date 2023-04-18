@@ -9,15 +9,14 @@ from deeprobust.graph import utils
 from copy import deepcopy
 from sklearn.metrics import f1_score
 
-class GraphConvolution(Module):
-    """Simple GCN layer, similar to https://github.com/tkipf/pygcn
-    """
 
-    def __init__(self, in_features, out_features, with_bias=True):
-        super(GraphConvolution, self).__init__()
+class GraphSAGE(nn.Module):
+    def __init__(self, in_features, out_features, aggr_method='mean', with_bias=True):
+        super(GraphSAGE, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = Parameter(torch.FloatTensor(in_features, out_features))
+        self.aggr_method = aggr_method
+        self.weight = Parameter(torch.FloatTensor(in_features*2, out_features))
         if with_bias:
             self.bias = Parameter(torch.FloatTensor(out_features))
         else:
@@ -25,28 +24,38 @@ class GraphConvolution(Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
-        self.weight.data.uniform_(-stdv, stdv)
+        nn.init.xavier_uniform_(self.weight)
         if self.bias is not None:
-            self.bias.data.uniform_(-stdv, stdv)
+            nn.init.zeros_(self.bias)
 
-    def forward(self, input, adj):
-        """ Graph Convolutional Layer forward function
-        """
-        if input.data.is_sparse:
-            support = torch.spmm(input, self.weight)
+    def forward(self, x, edge_index):
+        row, col = edge_index
+        if self.aggr_method == 'mean':
+            # Compute mean aggregation of neighbor nodes
+            neighbor_mean = torch.sparse.FloatTensor(row, col, torch.ones_like(row, dtype=torch.float32), 
+                                                      size=(x.shape[0], x.shape[0])).to(x.device)
+            neighbor_count = neighbor_mean @ x
+            neighbor_count = torch.clamp(neighbor_count, min=1)
+            neighbor_sum = neighbor_mean @ (x + self.bias)
+            neighbor_mean = neighbor_sum / neighbor_count
+            concat = torch.cat([x, neighbor_mean], dim=-1)
+            out = torch.mm(concat, self.weight)
         else:
-            support = torch.mm(input, self.weight)
-        output = torch.spmm(adj, support)
-        if self.bias is not None:
-            return output + self.bias
-        else:
-            return output
+            # Compute max aggregation of neighbor nodes
+            neighbor_max = torch.sparse.FloatTensor(row, col, torch.ones_like(row, dtype=torch.float32), 
+                                                     size=(x.shape[0], x.shape[0])).to(x.device)
+            neighbor_max = neighbor_max.coalesce()
+            neighbor_max.values()[row == col] = 0
+            neighbor_max = neighbor_max.sparse_mask(row != col)
+            neighbor_max, _ = torch.max(neighbor_max @ x, dim=-2)
+            concat = torch.cat([x, neighbor_max], dim=-1)
+            out = torch.mm(concat, self.weight)
+            if self.bias is not None:
+                out = out + self.bias
+        return out
 
     def __repr__(self):
-        return self.__class__.__name__ + ' (' \
-               + str(self.in_features) + ' -> ' \
-               + str(self.out_features) + ')'
+        return f'{self.__class__.__name__}({self.in_features*2}, {self.out_features}, aggr_method={self.aggr_method})'
 
 
 class BoundedGCN(nn.Module):
