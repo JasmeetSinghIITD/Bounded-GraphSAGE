@@ -29,8 +29,8 @@ class GraphSAGE(nn.Module):
             nn.init.zeros_(self.bias)
 
     def forward(self, x, adj):
-	rows, cols = torch.nonzero(adj, as_tuple=True)
-        if self.aggr_method == 'mean':
+	rows,cols = torch.nonzero(adj, as_tuple=True)
+       	if self.aggr_method == 'mean':
             # Compute mean aggregation of neighbor nodes
             neighbor_mean = torch.sparse.FloatTensor(row, col, torch.ones_like(row, dtype=torch.float32), 
                                                       size=(x.shape[0], x.shape[0])).to(x.device)
