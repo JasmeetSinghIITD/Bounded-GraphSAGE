@@ -8,83 +8,9 @@ from torch.nn.modules.module import Module
 from deeprobust.graph import utils
 from copy import deepcopy
 from sklearn.metrics import f1_score
+from torch_geometric.nn import SAGEConv
 
 
-
-class GraphSAGE(nn.Module):
-    """ GraphSAGE layer implementation
-    """
-    def __init__(self, in_feats, out_feats, aggregator_type='mean'):
-        super(GraphSAGE, self).__init__()
-
-        self.in_feats = in_feats
-        self.out_feats = out_feats
-        self.aggregator_type = aggregator_type
-
-        if aggregator_type == 'mean':
-            self.aggregator = MeanAggregator(in_feats, out_feats)
-        elif aggregator_type == 'maxpool':
-            self.aggregator = MaxPoolAggregator(in_feats, out_feats)
-        else:
-            raise ValueError("Aggregator type {} not recognized".format(aggregator_type))
-
-    def forward(self, nodes, adj):
-        """ GraphSAGE Layer forward function
-        """
-        neigh_feats = adj @ nodes
-        output = self.aggregator(neigh_feats)
-        return output
-
-
-class MeanAggregator(nn.Module):
-    """ Mean aggregator implementation for GraphSAGE
-    """
-    def __init__(self, in_feats, out_feats):
-        super(MeanAggregator, self).__init__()
-
-        self.in_feats = in_feats
-        self.out_feats = out_feats
-
-        self.linear = nn.Linear(in_feats + out_feats, out_feats)
-
-    def forward(self, neigh_feats):
-        """ Mean aggregator forward function
-        """
-        num_nodes = neigh_feats.shape[0]
-        if neigh_feats.numel() == 0:  # check if neigh_feats is empty
-            h_neigh = torch.zeros(1, self.out_feats)
-        else:
-            h_neigh = neigh_feats.sum(dim=0) / num_nodes
-        h_self = torch.zeros(num_nodes, self.in_feats)
-        if neigh_feats.is_cuda:
-            h_self = h_self.cuda()
-        h = torch.cat([h_self, h_neigh.expand(num_nodes, -1)], dim=1)
-        output = F.relu(self.linear(h))
-        return output
-
-
-class MaxPoolAggregator(nn.Module):
-    """ Maxpool aggregator implementation for GraphSAGE
-    """
-    def __init__(self, in_feats, out_feats):
-        super(MaxPoolAggregator, self).__init__()
-
-        self.in_feats = in_feats
-        self.out_feats = out_feats
-
-        self.linear = nn.Linear(in_feats * 2, out_feats)
-
-    def forward(self, neigh_feats):
-        """ Maxpool aggregator forward function
-        """
-        num_nodes = neigh_feats.shape[0]
-        h_neigh, _ = torch.max(neigh_feats, dim=0)
-        h_self = torch.zeros(num_nodes, self.in_feats)
-        if neigh_feats.is_cuda:
-            h_self = h_self.cuda()
-        h = torch.cat([h_self, h_neigh], dim=1)
-        output = F.relu(self.linear(h))
-        return output
 
 
 
@@ -139,8 +65,8 @@ class BoundedGCN(nn.Module):
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = GraphSAGE(nfeat, nhid, aggregator_type='mean')
-        self.gc2 = GraphSAGE(nhid, nclass, aggregator_type='mean')
+        self.gc1 = SAGEConv(nfeat, nhid, aggregator_type='mean')
+        self.gc2 = SAGEConv(nhid, nclass, aggregator_type='mean')
         self.dropout = dropout
         self.lr = lr
         self.bound=bound
