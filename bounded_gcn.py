@@ -85,16 +85,16 @@ class BoundedGCN(nn.Module):
     def forward(self, x, adj):
 
 	# Convert the adjacency matrix to a boolean tensor
-	adj_bool = adj.to(torch.bool)
+        adj_bool = adj.to(torch.bool)
 
 	# Create a mask for the upper triangular part of the adjacency matrix
-	mask = torch.triu(torch.ones_like(adj_bool), diagonal=1)
+        mask = torch.triu(torch.ones_like(adj_bool), diagonal=1)
 
 	# Get the indices of the non-zero elements in the upper triangular part
-	edge_index = mask.nonzero(as_tuple=False).t()
+        edge_index = mask.nonzero(as_tuple=False).t()
 
 	# Convert the edge index tensor to a long tensor
-	edge_index = edge_index.to(torch.long)
+        edge_index = edge_index.to(torch.long)
 
         h = self.gc1(x, edge_index)
         h = F.relu(h)
