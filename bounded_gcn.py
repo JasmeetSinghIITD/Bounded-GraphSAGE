@@ -9,7 +9,6 @@ from deeprobust.graph import utils
 from copy import deepcopy
 from sklearn.metrics import f1_score
 from torch_geometric.nn import SAGEConv
-torch.cuda.set_per_process_memory_fraction(0.8)
 
 
 
