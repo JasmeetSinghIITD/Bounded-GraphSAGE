@@ -133,7 +133,7 @@ class BoundedGCN(nn.Module):
             patience for early stopping, only valid when `idx_val` is given
         """
         print(" Using bounded gcn")
-        self.device = self.gc1.weight.device
+        self.device = self.gc1.root_weight.device
         if initialize:
             self.initialize()
 
