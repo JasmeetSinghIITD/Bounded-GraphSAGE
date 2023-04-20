@@ -9,6 +9,7 @@ from deeprobust.graph import utils
 from copy import deepcopy
 from sklearn.metrics import f1_score
 from torch_geometric.nn import SAGEConv
+export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb=512
 
 
 
