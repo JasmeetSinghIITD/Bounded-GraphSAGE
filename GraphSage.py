@@ -14,7 +14,7 @@ from torch_geometric.nn import SAGEConv
 
 
 
-class BoundedGCN(nn.Module):
+class GraphSage(nn.Module):
     """ 2 Layer Graph Convolutional Network.
     Parameters
     ----------
@@ -58,7 +58,7 @@ class BoundedGCN(nn.Module):
     def __init__(self, nfeat, nhid, nclass, dropout=0.5, lr=0.01, weight_decay=5e-4,
             with_relu=True, with_bias=True, device=None,bound=0 ):
 
-        super(BoundedGCN, self).__init__()
+        super(GraphSage, self).__init__()
 
         assert device is not None, "Please specify 'device'!"
         self.device = device
