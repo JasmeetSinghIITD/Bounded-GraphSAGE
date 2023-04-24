@@ -12,9 +12,7 @@ from deeprobust.graph.utils import preprocess, encode_onehot, get_train_val_test
 
 # Training settings
 parser = argparse.ArgumentParser()
-parser.add_argument('--bounded',type = str,help = "Bounded or regular",default="n") ##########################
-parser.add_argument('--bound', type=float, default=0, help='weight of bound importance')  ##########################
-
+parser.add_argument('--GraphSage',type = str,help = "Bounded or regular",default="n") ##########################
 parser.add_argument('--two_stage',type = str,help = "Use Two Stage",default="y")
 parser.add_argument('--optim',type = str,help = "Optimizer",default="sgd")
 parser.add_argument('--lr_optim',type = float, help = "learning rate for the graph weight update" ,default=1e-3)
@@ -113,9 +111,9 @@ np.random.seed(args.seed)
 torch.manual_seed(args.seed)
 
 ##########################
-if args.bounded == 'y':
+if args.GraphSage == 'y':
     from bounded_gcn import BoundedGCN
-    print("Using bounded gcn")
+    print("Using GraphSage")
     model = BoundedGCN(nfeat=features.shape[1],
                 nhid=args.hidden,
                 nclass=labels.max().item() + 1,
