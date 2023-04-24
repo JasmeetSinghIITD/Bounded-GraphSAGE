@@ -65,8 +65,8 @@ class BoundedGCN(nn.Module):
         self.nfeat = nfeat
         self.hidden_sizes = [nhid]
         self.nclass = nclass
-        self.gc1 = SAGEConv(nfeat, nhid, aggregator_type='mean')
-        self.gc2 = SAGEConv(nhid, nclass, aggregator_type='mean')
+        self.sage1 = SAGEConv(nfeat, nhid, aggregator_type='mean')
+        self.sage2 = SAGEConv(nhid, nclass, aggregator_type='mean')
         self.dropout = dropout
         self.lr = lr
         self.bound=bound
@@ -96,16 +96,16 @@ class BoundedGCN(nn.Module):
 	# Convert the edge index tensor to a long tensor
         edge_index = edge_index.to(torch.long)
 
-        h = self.gc1(x, edge_index)
+        h = self.sage1(x, edge_index)
         h = F.relu(h)
-        h = self.gc2(h, edge_index)
+        h = self.sage2(h, edge_index)
         return h
 
     def initialize(self):
         """Initialize parameters of GCN.
         """
-        self.gc1.reset_parameters()
-        self.gc2.reset_parameters()
+        self.sage1.reset_parameters()
+        self.sage2.reset_parameters()
 
     def fit(self, features, adj, labels, idx_train, idx_val=None, train_iters=200, initialize=True, verbose=False, normalize=True, patience=500, **kwargs):
         """Train the gcn model, when idx_val is not None, pick the best model according to the validation loss.
@@ -172,10 +172,10 @@ class BoundedGCN(nn.Module):
         for i in range(train_iters):
             optimizer.zero_grad()
             output = self.forward(self.features, self.adj_norm)
-            #self.l2_reg = self.bound * torch.square(torch.norm(self.gc1.weight)) + torch.square(torch.norm(self.gc2.weight))  # Added by me
+            
 
             print(f'L2 reg at iteration {i} = {l2_reg}')
-            loss_train = F.nll_loss(output[idx_train], labels[idx_train]) #+ self.bound*self.l2_reg
+            loss_train = F.nll_loss(output[idx_train], labels[idx_train]) 
             loss_train.backward()
             optimizer.step()
             if verbose and i % 10 == 0:
@@ -188,7 +188,7 @@ class BoundedGCN(nn.Module):
     def _train_with_val(self, labels, idx_train, idx_val, train_iters, verbose):
         print("Training with val")
         if verbose:
-            print('=== training gcn model ===')
+            print('=== training GraphSage model ===')
         optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
         best_loss_val = 100
@@ -199,12 +199,9 @@ class BoundedGCN(nn.Module):
             optimizer.zero_grad()
             output = self.forward(self.features, self.adj_norm)
 
-            #self.l2_reg = 2 * self.bound * (torch.log(torch.norm(self.gc1.weight)) + torch.log(torch.norm(self.gc2.weight)) )    # Added by me
+           
 
-            #if self.l2_reg<0:
-                #self.l2_reg=0
-
-            loss_train = F.nll_loss(output[idx_train], labels[idx_train]) #+ self.bound*self.l2_reg
+            loss_train = F.nll_loss(output[idx_train], labels[idx_train]) 
 
             if i%10==0:
                 print(f'l2 Reg = {self.l2_reg} , Loss = {loss_train}')
@@ -237,7 +234,7 @@ class BoundedGCN(nn.Module):
     def _train_with_early_stopping(self, labels, idx_train, idx_val, train_iters, patience, verbose):
         print("Training with early stopping")
         if verbose:
-            print('=== training gcn model ===')
+            print('=== training GraphSage model ===')
         optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
         early_stopping = patience
@@ -308,7 +305,7 @@ class BoundedGCN(nn.Module):
         Returns
         -------
         torch.FloatTensor
-            output (log probabilities) of GCN
+            output (log probabilities) of GraphSage
         """
 
         self.eval()
