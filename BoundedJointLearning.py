@@ -45,6 +45,7 @@ class RwlGNN:
         plt.plot(range(len(self.bound_losses)), self.bound_losses)
         plt.xlabel('Iteration')
         plt.ylabel('Bound Loss')
+        plt.savefig('plot.png')
         plt.show()
         
     def plot_cost(self):
