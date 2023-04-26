@@ -168,5 +168,5 @@ else:
     else:
         rwlgnn.fit(features, perturbed_adj, labels, idx_train, idx_val)
         rwlgnn.test(features, labels, idx_test)
-        rwlgnn.plot_boundloss()
+        rwlgnn.plot_cost()
 
