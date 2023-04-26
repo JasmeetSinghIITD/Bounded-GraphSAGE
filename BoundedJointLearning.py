@@ -185,13 +185,13 @@ class RwlGNN:
         y = y.to(self.device)
         y.requires_grad = True
 
-        if iter%20 == 0:
-            loss_fro = args.alpha* torch.norm(self.L(y) - L_noise, p='fro')
+        #if iter%20 == 0:
+        loss_fro = args.alpha* torch.norm(self.L(y) - L_noise, p='fro')
 
-            loss_smooth_feat =args.beta* self.feature_smoothing(self.A(y), features)
-            bound_loss = self.bound**2  * torch.log(torch.sqrt(torch.tensor(self.d)) * torch.square(torch.norm(self.A() - self.A(self.w_old))))
-            self.bound_losses.append(bound_loss.item())
-            print(f'Total loss = {loss_fro + loss_smooth_feat}, Bound loss = {bound_loss}')
+        loss_smooth_feat =args.beta* self.feature_smoothing(self.A(y), features)
+        bound_loss = self.bound**2  * torch.log(torch.sqrt(torch.tensor(self.d)) * torch.square(torch.norm(self.A() - self.A(self.w_old))))
+        self.bound_losses.append(bound_loss.item())
+        print(f'Total loss = {loss_fro + loss_smooth_feat}, Bound loss = {bound_loss}')
             
 
         normalized_adj = self.normalize(y)
