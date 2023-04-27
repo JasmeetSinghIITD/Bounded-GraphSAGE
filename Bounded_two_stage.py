@@ -28,6 +28,8 @@ class RwlGNN:
     def __init__(self,model, args, device):     #####################
         self.device = device
         self.args = args                            ##########################
+        self.bound_losses=[]
+
     def fit(self, features, adj):
         """Train RWL-GNN: Two-Stage.
         Parameters
@@ -108,13 +110,13 @@ class RwlGNN:
             new_term = self.bound * (2 * self.Astar(self.A()) - self.w_old) / (sq_norm_Aw - self.w_old.t() * self.weight) ##
 
             self.train_specific(c,new_term)
-            if epoch%20==0:
-                ##kk = sq_norm_Aw - self.w_old.t() * self.weight
-                bound_loss = self.bound**2 * torch.log(torch.sqrt(torch.tensor(self.d))*torch.square(torch.norm(self.A()-self.A(self.w_old))))
-                loss_fro = args.alpha * torch.norm(self.L() - L_noise, p='fro')
-                loss_smooth_feat = args.beta * self.feature_smoothing(self.A(), features)
-
-                print(f'Total loss = {loss_fro+loss_smooth_feat}, Bound loss = {bound_loss}')
+            
+            ##kk = sq_norm_Aw - self.w_old.t() * self.weight
+            bound_loss = self.bound**2 * torch.log(torch.sqrt(torch.tensor(self.d))*torch.square(torch.norm(self.A()-self.A(self.w_old))))
+            loss_fro = args.alpha * torch.norm(self.L() - L_noise, p='fro')
+            loss_smooth_feat = args.beta * self.feature_smoothing(self.A(), features)
+            self.bound_losses.append(bound_loss.item())
+            print(f'Total loss = {loss_fro+loss_smooth_feat}, Bound loss = {bound_loss}')
                 #print(f'sq_norm_Aw - self.w_old.t()*self.weight) = {kk.sum()}')
                 #print(f'New Term sum = {new_term.sum()}')
   
@@ -125,7 +127,13 @@ class RwlGNN:
 
         return self.A().detach()
 
-
+    def plot_boundloss(self):
+        plt.plot(range(len(self.bound_losses)), self.bound_losses)
+        plt.xlabel('Iteration')
+        plt.ylabel('Bound Loss')
+        plt.title("Bound Loss")
+        plt.savefig(f"{self.args.bound}_{self.args.beta}_{self.args.dataset}_{self.args.ptb_rate}_BOUND_LOSS for 2 stage.png")
+        plt.show(
 
     def w_grad(self,alpha,c,new_term):
       with torch.no_grad():
