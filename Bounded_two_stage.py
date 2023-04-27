@@ -133,7 +133,7 @@ class RwlGNN:
         plt.ylabel('Bound Loss')
         plt.title("Bound Loss")
         plt.savefig(f"{self.args.bound}_{self.args.beta}_{self.args.dataset}_{self.args.ptb_rate}_BOUND_LOSS for 2 stage.png")
-        plt.show(
+        plt.show()
 
     def w_grad(self,alpha,c,new_term):
       with torch.no_grad():
