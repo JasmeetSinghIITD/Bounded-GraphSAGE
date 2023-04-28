@@ -191,7 +191,8 @@ class RwlGNN:
 
         loss_smooth_feat =args.beta* self.feature_smoothing(self.A(y), features)
         bound_loss = self.bound**2  * torch.log(torch.sqrt(torch.tensor(self.d)) * torch.square(torch.norm(self.A() - self.A(self.w_old))))
-        self.bound_losses.append(bound_loss.item())
+        self.bound_loss=torch.sqrt(torch.tensor(self.d)) * torch.square(torch.norm(self.A() - self.A(self.w_old)))
+        
         print(f'Total loss = {loss_fro + loss_smooth_feat}, Bound loss = {bound_loss}')
             
 
@@ -288,7 +289,7 @@ class RwlGNN:
 
         self.l2_reg =  2 * self.bound**2  * ( torch.log(torch.norm(self.model.gc1.weight)) + torch.log(torch.norm(self.model.gc2.weight)) )  # Added by me
 
-
+        self.bound_losses.append((self.bound_loss+self.l2_reg).item())
         loss_train = F.nll_loss(output[idx_train], labels[idx_train]) + self.l2_reg
 
         if epoch % 20 == 0:
