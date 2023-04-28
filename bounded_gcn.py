@@ -18,6 +18,7 @@ class GraphConvolution(Module):
         self.in_features = in_features
         self.out_features = out_features
         self.weight = Parameter(torch.FloatTensor(in_features, out_features))
+	self.bound_losses=[]
         if with_bias:
             self.bias = Parameter(torch.FloatTensor(out_features))
         else:
@@ -29,7 +30,15 @@ class GraphConvolution(Module):
         self.weight.data.uniform_(-stdv, stdv)
         if self.bias is not None:
             self.bias.data.uniform_(-stdv, stdv)
-
+	
+    def plot_boundloss(self):
+        plt.plot(range(len(self.bound_losses)), self.bound_losses)
+        plt.xlabel('Iteration')
+        plt.ylabel('Bound Loss')
+        plt.title("Bound Loss")
+        plt.savefig(f"{self.args.bound}_{self.args.beta}_{self.args.dataset}_{self.args.ptb_rate}_BOUND_LOSS.png")
+        plt.show()
+        
     def forward(self, input, adj):
         """ Graph Convolutional Layer forward function
         """
@@ -226,7 +235,8 @@ class BoundedGCN(nn.Module):
             output = self.forward(self.features, self.adj_norm)
 
             self.l2_reg = 2 * self.bound**2 * (torch.log(torch.norm(self.gc1.weight)) + torch.log(torch.norm(self.gc2.weight)) )    # Added by me
-
+	    bound_loss = (torch.sqrt(torch.tensor(self.d)) * torch.square(torch.norm(self.A() - self.A(self.w_old))))+self.l2_reg
+            self.bound_losses.append(bound_loss.item())
             #if self.l2_reg<0:
             #    self.l2_reg=0
 
