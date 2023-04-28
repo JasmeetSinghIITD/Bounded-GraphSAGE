@@ -235,7 +235,7 @@ class BoundedGCN(nn.Module):
             output = self.forward(self.features, self.adj_norm)
 
             self.l2_reg = 2 * self.bound**2 * (torch.log(torch.norm(self.gc1.weight)) + torch.log(torch.norm(self.gc2.weight)) )    # Added by me
-	    bound_loss = (torch.sqrt(torch.tensor(self.d)) * torch.square(torch.norm(self.A() - self.A(self.w_old))))+self.l2_reg
+            bound_loss = (torch.sqrt(torch.tensor(self.d)) * torch.square(torch.norm(self.A() - self.A(self.w_old))))+self.l2_reg
             self.bound_losses.append(bound_loss.item())
             #if self.l2_reg<0:
             #    self.l2_reg=0
