@@ -65,7 +65,7 @@ class RwlGNN:
         
         
     def plot_boundloss(self):
-        plt.plot(range(len(self.bound_losses)), self.bound_losses)
+        plt.plot(range(len(self.bound_losses))*10, self.bound_losses)
         plt.xlabel('Iteration')
         plt.ylabel('Bound Loss')
         plt.title("Convergence of Bound Loss for_{self.args.dataset}_with_{self.args.ptb_rate}_ptb rate")
